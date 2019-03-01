@@ -33,7 +33,7 @@ import com.google.android.libraries.places.compat.GeoDataClient;
 import com.google.android.libraries.places.compat.PlaceDetectionClient;
 import com.google.android.libraries.places.compat.AutocompleteFilter;
 import com.google.android.libraries.places.compat.AutocompletePrediction;
-import com.google.android.libraries.places.compat.AutocompletePredictionBufferResponse;
+import com.google.android.libraries.places.compat.AutocompletePredictionBuffer;
 import com.google.android.libraries.places.compat.Place;
 import com.google.android.libraries.places.compat.PlaceBuffer;
 import com.google.android.libraries.places.compat.PlaceLikelihood;
@@ -242,12 +242,12 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             bounds = this.getLatLngBounds(center, radius);
         }
 
-        Task<AutocompletePredictionBufferResponse> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
+        Task<AutocompletePredictionBuffer> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
 
-        placeResult.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBufferResponse>() {
+        placeResult.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBuffer>() {
             @Override
-            public void onComplete(Task<AutocompletePredictionBufferResponse> task) {
-                AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
+            public void onComplete(Task<AutocompletePredictionBuffer> task) {
+                AutocompletePredictionBuffer autocompletePredictions = task.getResult();
 
                 final Status status = autocompletePredictions.getStatus();
 

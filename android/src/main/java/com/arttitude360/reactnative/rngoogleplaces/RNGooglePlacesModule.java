@@ -26,6 +26,7 @@ import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.libraries.places.compat.GeoDataClient;
@@ -243,49 +244,52 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
         Task<AutocompletePredictionBufferResponse> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
 
-        placeResult.addOnCompleteListener((Task<PlaceLikelihoodBufferResponse> task) -> {
-            AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
+        placeResult.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBufferResponse>() {
+            @Override
+            public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
+                AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
 
-            final Status status = autocompletePredictions.getStatus();
+                final Status status = autocompletePredictions.getStatus();
 
-            if (status.isSuccess()) {
-                if (autocompletePredictions.getCount() == 0) {
-                    WritableArray emptyResult = Arguments.createArray();
-                    autocompletePredictions.release();
-                    promise.resolve(emptyResult);
-                    return;
-                }
-
-                WritableArray predictionsList = Arguments.createArray();
-
-                for (AutocompletePrediction prediction : autocompletePredictions) {
-                    WritableMap map = Arguments.createMap();
-                    map.putString("fullText", prediction.getFullText(null).toString());
-                    map.putString("primaryText", prediction.getPrimaryText(null).toString());
-                    map.putString("secondaryText", prediction.getSecondaryText(null).toString());
-                    map.putString("placeID", prediction.getPlaceId().toString());
-
-                    if (prediction.getPlaceTypes() != null) {
-                        List<String> types = new ArrayList<>();
-                        for (Integer placeType : prediction.getPlaceTypes()) {
-                            types.add(findPlaceTypeLabelByPlaceTypeId(placeType));
-                        }
-                        map.putArray("types", Arguments.fromArray(types.toArray(new String[0])));
+                if (status.isSuccess()) {
+                    if (autocompletePredictions.getCount() == 0) {
+                        WritableArray emptyResult = Arguments.createArray();
+                        autocompletePredictions.release();
+                        promise.resolve(emptyResult);
+                        return;
                     }
 
-                    predictionsList.pushMap(map);
+                    WritableArray predictionsList = Arguments.createArray();
+
+                    for (AutocompletePrediction prediction : autocompletePredictions) {
+                        WritableMap map = Arguments.createMap();
+                        map.putString("fullText", prediction.getFullText(null).toString());
+                        map.putString("primaryText", prediction.getPrimaryText(null).toString());
+                        map.putString("secondaryText", prediction.getSecondaryText(null).toString());
+                        map.putString("placeID", prediction.getPlaceId().toString());
+
+                        if (prediction.getPlaceTypes() != null) {
+                            List<String> types = new ArrayList<>();
+                            for (Integer placeType : prediction.getPlaceTypes()) {
+                                types.add(findPlaceTypeLabelByPlaceTypeId(placeType));
+                            }
+                            map.putArray("types", Arguments.fromArray(types.toArray(new String[0])));
+                        }
+
+                        predictionsList.pushMap(map);
+                    }
+
+                    // Release the buffer now that all data has been copied.
+                    autocompletePredictions.release();
+                    promise.resolve(predictionsList);
+
+                } else {
+                    Log.i(TAG, "Error making autocomplete prediction API call: " + status.toString());
+                    autocompletePredictions.release();
+                    promise.reject("E_AUTOCOMPLETE_ERROR",
+                            new Error("Error making autocomplete prediction API call: " + status.toString()));
+                    return;
                 }
-
-                // Release the buffer now that all data has been copied.
-                autocompletePredictions.release();
-                promise.resolve(predictionsList);
-
-            } else {
-                Log.i(TAG, "Error making autocomplete prediction API call: " + status.toString());
-                autocompletePredictions.release();
-                promise.reject("E_AUTOCOMPLETE_ERROR",
-                        new Error("Error making autocomplete prediction API call: " + status.toString()));
-                return;
             }
         });
     }
@@ -468,30 +472,30 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
         AutocompleteFilter mappedFilter;
 
         switch (type) {
-        case "geocode":
-            mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_GEOCODE)
-                    .setCountry(country).build();
-            break;
-        case "address":
-            mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_ADDRESS)
-                    .setCountry(country).build();
-            break;
-        case "establishment":
-            mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_ESTABLISHMENT)
-                    .setCountry(country).build();
-            break;
-        case "regions":
-            mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_REGIONS)
-                    .setCountry(country).build();
-            break;
-        case "cities":
-            mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_CITIES)
-                    .setCountry(country).build();
-            break;
-        default:
-            mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_NONE)
-                    .setCountry(country).build();
-            break;
+            case "geocode":
+                mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_GEOCODE)
+                        .setCountry(country).build();
+                break;
+            case "address":
+                mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_ADDRESS)
+                        .setCountry(country).build();
+                break;
+            case "establishment":
+                mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_ESTABLISHMENT)
+                        .setCountry(country).build();
+                break;
+            case "regions":
+                mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_REGIONS)
+                        .setCountry(country).build();
+                break;
+            case "cities":
+                mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_CITIES)
+                        .setCountry(country).build();
+                break;
+            default:
+                mappedFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_NONE)
+                        .setCountry(country).build();
+                break;
         }
 
         return mappedFilter;

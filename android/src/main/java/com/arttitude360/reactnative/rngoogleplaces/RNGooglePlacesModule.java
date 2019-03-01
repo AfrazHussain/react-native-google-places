@@ -27,6 +27,8 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
+import com.google.android.libraries.places.compat.GeoDataClient;
+import com.google.android.libraries.places.compat.PlaceDetectionClient;
 import com.google.android.libraries.places.compat.AutocompleteFilter;
 import com.google.android.libraries.places.compat.AutocompletePrediction;
 import com.google.android.libraries.places.compat.AutocompletePredictionBuffer;
@@ -55,6 +57,9 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
     protected GoogleApiClient mGoogleApiClient;
 
+    protected GeoDataClient geoDataClient;
+    protected PlaceDetectionClient placeDetectionClient;
+
     public static int AUTOCOMPLETE_REQUEST_CODE = 360;
     public static int PLACE_PICKER_REQUEST_CODE = 361;
     public static int PLACES_RESOLUTION_CODE = 362;
@@ -63,7 +68,10 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
     public RNGooglePlacesModule(ReactApplicationContext reactContext) {
         super(reactContext);
 
-        buildGoogleApiClient();
+//        buildGoogleApiClient();
+
+        geoDataClient = Places.getGeoDataClient(this, null);
+        placeDetectionClient = Places.getPlaceDetectionClient(this, null);
 
         this.reactContext = reactContext;
         this.reactContext.addActivityEventListener(this);
@@ -89,7 +97,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
     public void onActivityResult(Activity activity, final int requestCode, final int resultCode, final Intent data) {
 
         // Check that the result was from the autocomplete widget.
-        if (requestCode == AUTOCOMPLETE_REQUEST_CODE) {
+        if (requestCode == AUTOCOMPLETE_REQUEST) {
             if (resultCode == Activity.RESULT_OK) {
                 // Get the user's selected place from the Intent.
                 Place place = PlaceAutocomplete.getPlace(this.reactContext.getApplicationContext(), data);
@@ -125,9 +133,9 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
         if (requestCode == PLACES_RESOLUTION_CODE) {
             Log.i(TAG, "Google API Client resolution result: " + resultCode);
             if (resultCode == Activity.RESULT_OK) {
-                if (!mGoogleApiClient.isConnecting() &&
-                        !mGoogleApiClient.isConnected()) {
-                    mGoogleApiClient.connect();
+                if (!geoDataClient.isConnecting() &&
+                        !geoDataClient.isConnected()) {
+                    geoDataClient.connect();
                 }
             }
         }
@@ -232,8 +240,8 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             bounds = this.getLatLngBounds(center, radius);
         }
 
-        PendingResult<AutocompletePredictionBuffer> results = Places.GeoDataApi
-                .getAutocompletePredictions(mGoogleApiClient, query, bounds, getFilterType(type, country));
+        PendingResult<AutocompletePredictionBuffer> results = geoDataClient
+                .getAutocompletePredictions(query, bounds, getFilterType(type, country));
 
         AutocompletePredictionBuffer autocompletePredictions = results.await(60, TimeUnit.SECONDS);
 
@@ -286,7 +294,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
         if (this.isClientDisconnected()) return;
 
-        Places.GeoDataApi.getPlaceById(mGoogleApiClient, placeID).setResultCallback(new ResultCallback<PlaceBuffer>() {
+        geoDataClient.getPlaceById(placeID).setResultCallback(new ResultCallback<PlaceBuffer>() {
             @Override
             public void onResult(PlaceBuffer places) {
                 if (places.getStatus().isSuccess()) {
@@ -324,7 +332,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             placeIDsStrings.add(Objects.toString(item, null));
         }
 
-        Places.GeoDataApi.getPlaceById(mGoogleApiClient, placeIDsStrings.toArray(new String[placeIDsStrings.size()]))
+        geoDataClient.getPlaceById(placeIDsStrings.toArray(new String[placeIDsStrings.size()]))
                 .setResultCallback(new ResultCallback<PlaceBuffer>() {
                     @Override
                     public void onResult(PlaceBuffer places) {
@@ -354,7 +362,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
     @ReactMethod
     public void getCurrentPlace(final Promise promise) {
-        Places.PlaceDetectionApi.getCurrentPlace(mGoogleApiClient, null)
+        placeDetectionClient.getCurrentPlace(null)
             .setResultCallback(new ResultCallback<PlaceLikelihoodBuffer>() {
                 @Override
                 public void onResult(PlaceLikelihoodBuffer likelyPlaces) {
@@ -513,12 +521,12 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
     // check before any use of Google API Client
     private boolean isClientDisconnected() {
-        if (!mGoogleApiClient.isConnecting() &&
-                !mGoogleApiClient.isConnected()) {
+        if (!geoDataClient.isConnecting() &&
+                !geoDataClient.isConnected()) {
             rejectPromise("E_GOOGLE_CLIENT_DISCONNECTED", new Error("GoogleApiClient is not connected. Will try connect again"));
             // this will trigger again resolution on connection failure when
             // autoClientResolution is true and if has resolution
-            mGoogleApiClient.connect();
+            geoDataClient.connect();
             return true;
         }
 

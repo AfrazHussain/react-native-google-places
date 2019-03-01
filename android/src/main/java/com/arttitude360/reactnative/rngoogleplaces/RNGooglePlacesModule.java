@@ -51,6 +51,10 @@ import java.util.Objects;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.InterruptedException;
+import java.util.concurrent.TimeoutException;
+
 
 public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements ActivityEventListener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {

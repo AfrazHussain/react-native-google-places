@@ -70,8 +70,8 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
 //        buildGoogleApiClient();
 
-        geoDataClient = Places.getGeoDataClient(getBaseContext(), null);
-        placeDetectionClient = Places.getPlaceDetectionClient(getBaseContext(), null);
+        geoDataClient = Places.getGeoDataClient(reactContext.getApplicationContext(), null);
+        placeDetectionClient = Places.getPlaceDetectionClient(reactContext.getApplicationContext(), null);
 
         this.reactContext = reactContext;
         this.reactContext.addActivityEventListener(this);

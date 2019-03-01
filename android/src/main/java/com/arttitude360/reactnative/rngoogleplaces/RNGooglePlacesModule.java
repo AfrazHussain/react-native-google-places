@@ -243,53 +243,54 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             bounds = this.getLatLngBounds(center, radius);
         }
 
-        Task<AutocompletePredictionBufferResponse> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
+        Task<AutocompletePredictionBufferResponse> results = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
 
-        predictionResults.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBufferResponse>() {
-            @Override
-            public void onComplete(Task<AutocompletePredictionBufferResponse> task) {
-                AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
+        try {
+            Tasks.await(results, 60, TimeUnit.SECONDS);
+        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            e.printStackTrace();
+        }
 
-                try {
-                    if (autocompletePredictions.getCount() == 0) {
-                        WritableArray emptyResult = Arguments.createArray();
-                        autocompletePredictions.release();
-                        promise.resolve(emptyResult);
-                        return;
-                    }
+        try {
+            AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
 
-                    WritableArray predictionsList = Arguments.createArray();
-
-                    for (AutocompletePrediction prediction : autocompletePredictions) {
-                        WritableMap map = Arguments.createMap();
-                        map.putString("fullText", prediction.getFullText(null).toString());
-                        map.putString("primaryText", prediction.getPrimaryText(null).toString());
-                        map.putString("secondaryText", prediction.getSecondaryText(null).toString());
-                        map.putString("placeID", prediction.getPlaceId().toString());
-
-                        if (prediction.getPlaceTypes() != null) {
-                            List<String> types = new ArrayList<>();
-                            for (Integer placeType : prediction.getPlaceTypes()) {
-                                types.add(findPlaceTypeLabelByPlaceTypeId(placeType));
-                            }
-                            map.putArray("types", Arguments.fromArray(types.toArray(new String[0])));
-                        }
-
-                        predictionsList.pushMap(map);
-                    }
-
-                    // Release the buffer now that all data has been copied.
-                    autocompletePredictions.release();
-                    promise.resolve(predictionsList);
-
-                } catch (RuntimeExecutionException e) {
-                    Log.i(TAG, "Error making autocomplete prediction API call: " );
-                    autocompletePredictions.release();
-                    promise.reject("E_AUTOCOMPLETE_ERROR",
-                            new Error("Error making autocomplete prediction API call: "));
-                }
+            if (autocompletePredictions.getCount() == 0) {
+                WritableArray emptyResult = Arguments.createArray();
+                autocompletePredictions.release();
+                promise.resolve(emptyResult);
+                return;
             }
-        });
+
+            WritableArray predictionsList = Arguments.createArray();
+
+            for (AutocompletePrediction prediction : autocompletePredictions) {
+                WritableMap map = Arguments.createMap();
+                map.putString("fullText", prediction.getFullText(null).toString());
+                map.putString("primaryText", prediction.getPrimaryText(null).toString());
+                map.putString("secondaryText", prediction.getSecondaryText(null).toString());
+                map.putString("placeID", prediction.getPlaceId().toString());
+
+                if (prediction.getPlaceTypes() != null) {
+                    List<String> types = new ArrayList<>();
+                    for (Integer placeType : prediction.getPlaceTypes()) {
+                        types.add(findPlaceTypeLabelByPlaceTypeId(placeType));
+                    }
+                    map.putArray("types", Arguments.fromArray(types.toArray(new String[0])));
+                }
+
+                predictionsList.pushMap(map);
+            }
+
+            // Release the buffer now that all data has been copied.
+            autocompletePredictions.release();
+            promise.resolve(predictionsList);
+
+        } catch (RuntimeExecutionException e) {
+            Log.i(TAG, "Error making autocomplete prediction API call: ");
+            autocompletePredictions.release();
+            promise.reject("E_AUTOCOMPLETE_ERROR",
+                    new Error("Error making autocomplete prediction API call: "));
+        }
     }
 
     @ReactMethod

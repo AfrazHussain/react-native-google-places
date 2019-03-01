@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.InterruptedException;
 import java.util.concurrent.TimeoutException;
 
 
@@ -292,7 +291,6 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
         } catch (RuntimeExecutionException e) {
             Log.i(TAG, "Error making autocomplete prediction API call: ");
-            autocompletePredictions.release();
             promise.reject("E_AUTOCOMPLETE_ERROR",
                     new Error("Error making autocomplete prediction API call: "));
         }

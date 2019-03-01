@@ -37,7 +37,7 @@ import com.google.android.libraries.places.compat.AutocompleteFilter;
 import com.google.android.libraries.places.compat.AutocompletePrediction;
 import com.google.android.libraries.places.compat.AutocompletePredictionBufferResponse;
 import com.google.android.libraries.places.compat.Place;
-import com.google.android.libraries.places.compat.PlaceBuffer;
+import com.google.android.libraries.places.compat.PlaceBufferResponse;
 import com.google.android.libraries.places.compat.PlaceLikelihood;
 import com.google.android.libraries.places.compat.PlaceLikelihoodBuffer;
 import com.google.android.libraries.places.compat.Places;
@@ -298,38 +298,44 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
     @ReactMethod
     public void lookUpPlaceByID(String placeID, final Promise promise) {
-//        this.pendingPromise = promise;
+        this.pendingPromise = promise;
 
-//        if (this.isClientDisconnected()) return;
 
-//        geoDataClient.getPlaceById(placeID).addOnCompleteListener(new OnCompleteListener<PlaceBuffer>() {
-//            @Override
-//            public void onResult(PlaceBuffer places) {
-//                if (places.getStatus().isSuccess()) {
-//                    if (places.getCount() == 0) {
-//                        WritableMap emptyResult = Arguments.createMap();
-//                        places.release();
-//                        promise.resolve(emptyResult);
-//                        return;
-//                    }
+        Task<PlaceBufferResponse> results = geoDataClient.getPlaceById(placeID);
 //
-//                    final Place place = places.get(0);
-//
-//                    WritableMap map = propertiesMapForPlace(place);
-//
-//                    // Release the PlaceBuffer to prevent a memory leak
-//                    places.release();
-//
-//                    promise.resolve(map);
-//
-//                } else {
-//                    places.release();
-//                    promise.reject("E_PLACE_DETAILS_ERROR",
-//                            new Error("Error making place lookup API call: " + places.getStatus().toString()));
-//                    return;
-//                }
-//            }
-//        });
+//        try {
+//            Tasks.await(results, 60, TimeUnit.SECONDS);
+//        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+//            e.printStackTrace();
+//        }
+
+        results.addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
+            @Override
+            public void onComplete(Task<PlaceBufferResponse> task) {
+                PlaceBufferResponse places = task.getResult();
+                try {
+                    if (places.getCount() == 0) {
+                        WritableMap emptyResult = Arguments.createMap();
+                        places.release();
+                        promise.resolve(emptyResult);
+                        return;
+                    }
+
+                    final Place place = places.get(0);
+
+                    WritableMap map = propertiesMapForPlace(place);
+
+                    // Release the PlaceBufferResponse to prevent a memory leak
+                    places.release();
+                    promise.resolve(map);
+
+                } catch (RuntimeExecutionException e) {
+                    places.release();
+                    promise.reject("E_PLACE_DETAILS_ERROR",
+                            new Error("Error making place lookup API call: " + e.toString()));
+                }
+            }
+        });
     }
 
     @ReactMethod
@@ -341,9 +347,9 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
         }
 
 //        geoDataClient.getPlaceById(placeIDsStrings.toArray(new String[placeIDsStrings.size()]))
-//                .setResultCallback(new ResultCallback<PlaceBuffer>() {
+//                .setResultCallback(new ResultCallback<PlaceBufferResponse>() {
 //                    @Override
-//                    public void onResult(PlaceBuffer places) {
+//                    public void onResult(PlaceBufferResponse places) {
 //                        if (places.getStatus().isSuccess()) {
 //                            if (places.getCount() == 0) {
 //                                WritableMap emptyResult = Arguments.createMap();
@@ -354,7 +360,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 //
 //                            WritableArray resultList = processLookupByIDsPlaces(places);
 //
-//                            // Release the PlaceBuffer to prevent a memory leak
+//                            // Release the PlaceBufferResponse to prevent a memory leak
 //                            places.release();
 //
 //                            promise.resolve(resultList);
@@ -407,7 +413,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 //            });
     }
 
-    private WritableArray processLookupByIDsPlaces(final PlaceBuffer places) {
+    private WritableArray processLookupByIDsPlaces(final PlaceBufferResponse places) {
         WritableArray resultList = new WritableNativeArray();
 
         for (Place place : places) {

@@ -252,7 +252,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
         }
 
         try {
-            AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
+            AutocompletePredictionBufferResponse autocompletePredictions = results.getResult();
 
             if (autocompletePredictions.getCount() == 0) {
                 WritableArray emptyResult = Arguments.createArray();

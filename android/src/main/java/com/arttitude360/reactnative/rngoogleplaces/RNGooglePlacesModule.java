@@ -33,7 +33,7 @@ import com.google.android.libraries.places.compat.GeoDataClient;
 import com.google.android.libraries.places.compat.PlaceDetectionClient;
 import com.google.android.libraries.places.compat.AutocompleteFilter;
 import com.google.android.libraries.places.compat.AutocompletePrediction;
-import com.google.android.libraries.places.compat.AutocompletePredictionBuffer;
+import com.google.android.libraries.places.compat.AutocompletePredictionBufferResponse;
 import com.google.android.libraries.places.compat.Place;
 import com.google.android.libraries.places.compat.PlaceBuffer;
 import com.google.android.libraries.places.compat.PlaceLikelihood;
@@ -242,16 +242,14 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             bounds = this.getLatLngBounds(center, radius);
         }
 
-        Task<AutocompletePredictionBuffer> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
+        Task<AutocompletePredictionBufferResponse> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
 
-        placeResult.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBuffer>() {
+        predictionResults.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBufferResponse>() {
             @Override
-            public void onComplete(Task<AutocompletePredictionBuffer> task) {
-                AutocompletePredictionBuffer autocompletePredictions = task.getResult();
+            public void onComplete(Task<AutocompletePredictionBufferResponse> task) {
+                AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
 
-                final Status status = autocompletePredictions.getStatus();
-
-                if (status.isSuccess()) {
+                try {
                     if (autocompletePredictions.getCount() == 0) {
                         WritableArray emptyResult = Arguments.createArray();
                         autocompletePredictions.release();
@@ -283,12 +281,11 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
                     autocompletePredictions.release();
                     promise.resolve(predictionsList);
 
-                } else {
+                } catch (RuntimeExecutionException e) {
                     Log.i(TAG, "Error making autocomplete prediction API call: " + status.toString());
                     autocompletePredictions.release();
                     promise.reject("E_AUTOCOMPLETE_ERROR",
                             new Error("Error making autocomplete prediction API call: " + status.toString()));
-                    return;
                 }
             }
         });

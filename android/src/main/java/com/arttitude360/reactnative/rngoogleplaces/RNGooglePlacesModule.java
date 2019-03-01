@@ -246,7 +246,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
         placeResult.addOnCompleteListener(new OnCompleteListener<AutocompletePredictionBufferResponse>() {
             @Override
-            public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
+            public void onComplete(Task<AutocompletePredictionBufferResponse> task) {
                 AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
 
                 final Status status = autocompletePredictions.getStatus();

@@ -290,9 +290,9 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             promise.resolve(predictionsList);
 
         } catch (RuntimeExecutionException e) {
-            Log.i(TAG, "Error making autocomplete prediction API call: ");
+            Log.i(TAG, "Error making autocomplete prediction API call: " + e.toString());
             promise.reject("E_AUTOCOMPLETE_ERROR",
-                    new Error("Error making autocomplete prediction API call: "));
+                    new Error("Error making autocomplete prediction API call: " + e.toString()));
         }
     }
 

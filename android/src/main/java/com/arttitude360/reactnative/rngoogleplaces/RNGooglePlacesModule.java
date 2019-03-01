@@ -70,8 +70,8 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
 //        buildGoogleApiClient();
 
-        geoDataClient = Places.getGeoDataClient(this, null);
-        placeDetectionClient = Places.getPlaceDetectionClient(this, null);
+        geoDataClient = Places.getGeoDataClient(getBaseContext(), null);
+        placeDetectionClient = Places.getPlaceDetectionClient(getBaseContext(), null);
 
         this.reactContext = reactContext;
         this.reactContext.addActivityEventListener(this);
@@ -82,13 +82,13 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
         return REACT_CLASS;
     }
 
-    protected synchronized void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(getReactApplicationContext()).addApi(Places.GEO_DATA_API)
-                .addApi(Places.PLACE_DETECTION_API).addConnectionCallbacks(this).addOnConnectionFailedListener(this)
-                .build();
-
-        mGoogleApiClient.connect();
-    }
+//    protected synchronized void buildGoogleApiClient() {
+//        mGoogleApiClient = new GoogleApiClient.Builder(getReactApplicationContext()).addApi(Places.GEO_DATA_API)
+//                .addApi(Places.PLACE_DETECTION_API).addConnectionCallbacks(this).addOnConnectionFailedListener(this)
+//                .build();
+//
+//        mGoogleApiClient.connect();
+//    }
 
     /**
      * Called after the autocomplete activity has finished to return its result.

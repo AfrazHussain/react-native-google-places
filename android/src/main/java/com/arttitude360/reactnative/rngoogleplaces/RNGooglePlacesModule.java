@@ -27,6 +27,7 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.RuntimeExecutionException;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.libraries.places.compat.GeoDataClient;
@@ -282,10 +283,10 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
                     promise.resolve(predictionsList);
 
                 } catch (RuntimeExecutionException e) {
-                    Log.i(TAG, "Error making autocomplete prediction API call: " + status.toString());
+                    Log.i(TAG, "Error making autocomplete prediction API call: " );
                     autocompletePredictions.release();
                     promise.reject("E_AUTOCOMPLETE_ERROR",
-                            new Error("Error making autocomplete prediction API call: " + status.toString()));
+                            new Error("Error making autocomplete prediction API call: "));
                 }
             }
         });

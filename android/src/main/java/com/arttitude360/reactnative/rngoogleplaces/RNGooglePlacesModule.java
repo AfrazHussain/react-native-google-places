@@ -25,13 +25,14 @@ import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.tasks.Task;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.libraries.places.compat.GeoDataClient;
 import com.google.android.libraries.places.compat.PlaceDetectionClient;
 import com.google.android.libraries.places.compat.AutocompleteFilter;
 import com.google.android.libraries.places.compat.AutocompletePrediction;
-import com.google.android.libraries.places.compat.AutocompletePredictionBuffer;
+import com.google.android.libraries.places.compat.AutocompletePredictionBufferResponse;
 import com.google.android.libraries.places.compat.Place;
 import com.google.android.libraries.places.compat.PlaceBuffer;
 import com.google.android.libraries.places.compat.PlaceLikelihood;
@@ -97,7 +98,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
     public void onActivityResult(Activity activity, final int requestCode, final int resultCode, final Intent data) {
 
         // Check that the result was from the autocomplete widget.
-        if (requestCode == AUTOCOMPLETE_REQUEST) {
+        if (requestCode == AUTOCOMPLETE_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
                 // Get the user's selected place from the Intent.
                 Place place = PlaceAutocomplete.getPlace(this.reactContext.getApplicationContext(), data);
@@ -132,12 +133,12 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
 
         if (requestCode == PLACES_RESOLUTION_CODE) {
             Log.i(TAG, "Google API Client resolution result: " + resultCode);
-            if (resultCode == Activity.RESULT_OK) {
-                if (!geoDataClient.isConnecting() &&
-                        !geoDataClient.isConnected()) {
-                    geoDataClient.connect();
-                }
-            }
+//            if (resultCode == Activity.RESULT_OK) {
+//                if (!geoDataClient.isConnecting() &&
+//                        !geoDataClient.isConnected()) {
+//                    geoDataClient.connect();
+//                }
+//            }
         }
     }
 
@@ -223,7 +224,7 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
     public void getAutocompletePredictions(String query, ReadableMap options, final Promise promise) {
         this.pendingPromise = promise;
 
-        if (this.isClientDisconnected()) return;
+//        if (this.isClientDisconnected()) return;
 
         String type = options.getString("type");
         String country = options.getString("country");
@@ -240,88 +241,89 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             bounds = this.getLatLngBounds(center, radius);
         }
 
-        PendingResult<AutocompletePredictionBuffer> results = geoDataClient
-                .getAutocompletePredictions(query, bounds, getFilterType(type, country));
+        Task<AutocompletePredictionBufferResponse> predictionResults = geoDataClient.getAutocompletePredictions(query, bounds, getFilterType(type, country));
 
-        AutocompletePredictionBuffer autocompletePredictions = results.await(60, TimeUnit.SECONDS);
+        placeResult.addOnCompleteListener((Task<PlaceLikelihoodBufferResponse> task) -> {
+            AutocompletePredictionBufferResponse autocompletePredictions = task.getResult();
 
-        final Status status = autocompletePredictions.getStatus();
+            final Status status = autocompletePredictions.getStatus();
 
-        if (status.isSuccess()) {
-            if (autocompletePredictions.getCount() == 0) {
-                WritableArray emptyResult = Arguments.createArray();
-                autocompletePredictions.release();
-                promise.resolve(emptyResult);
-                return;
-            }
-
-            WritableArray predictionsList = Arguments.createArray();
-
-            for (AutocompletePrediction prediction : autocompletePredictions) {
-                WritableMap map = Arguments.createMap();
-                map.putString("fullText", prediction.getFullText(null).toString());
-                map.putString("primaryText", prediction.getPrimaryText(null).toString());
-                map.putString("secondaryText", prediction.getSecondaryText(null).toString());
-                map.putString("placeID", prediction.getPlaceId().toString());
-
-                if (prediction.getPlaceTypes() != null) {
-                    List<String> types = new ArrayList<>();
-                    for (Integer placeType : prediction.getPlaceTypes()) {
-                        types.add(findPlaceTypeLabelByPlaceTypeId(placeType));
-                    }
-                    map.putArray("types", Arguments.fromArray(types.toArray(new String[0])));
+            if (status.isSuccess()) {
+                if (autocompletePredictions.getCount() == 0) {
+                    WritableArray emptyResult = Arguments.createArray();
+                    autocompletePredictions.release();
+                    promise.resolve(emptyResult);
+                    return;
                 }
 
-                predictionsList.pushMap(map);
+                WritableArray predictionsList = Arguments.createArray();
+
+                for (AutocompletePrediction prediction : autocompletePredictions) {
+                    WritableMap map = Arguments.createMap();
+                    map.putString("fullText", prediction.getFullText(null).toString());
+                    map.putString("primaryText", prediction.getPrimaryText(null).toString());
+                    map.putString("secondaryText", prediction.getSecondaryText(null).toString());
+                    map.putString("placeID", prediction.getPlaceId().toString());
+
+                    if (prediction.getPlaceTypes() != null) {
+                        List<String> types = new ArrayList<>();
+                        for (Integer placeType : prediction.getPlaceTypes()) {
+                            types.add(findPlaceTypeLabelByPlaceTypeId(placeType));
+                        }
+                        map.putArray("types", Arguments.fromArray(types.toArray(new String[0])));
+                    }
+
+                    predictionsList.pushMap(map);
+                }
+
+                // Release the buffer now that all data has been copied.
+                autocompletePredictions.release();
+                promise.resolve(predictionsList);
+
+            } else {
+                Log.i(TAG, "Error making autocomplete prediction API call: " + status.toString());
+                autocompletePredictions.release();
+                promise.reject("E_AUTOCOMPLETE_ERROR",
+                        new Error("Error making autocomplete prediction API call: " + status.toString()));
+                return;
             }
-
-            // Release the buffer now that all data has been copied.
-            autocompletePredictions.release();
-            promise.resolve(predictionsList);
-
-        } else {
-            Log.i(TAG, "Error making autocomplete prediction API call: " + status.toString());
-            autocompletePredictions.release();
-            promise.reject("E_AUTOCOMPLETE_ERROR",
-                    new Error("Error making autocomplete prediction API call: " + status.toString()));
-            return;
-        }
+        });
     }
 
     @ReactMethod
     public void lookUpPlaceByID(String placeID, final Promise promise) {
-        this.pendingPromise = promise;
+//        this.pendingPromise = promise;
 
-        if (this.isClientDisconnected()) return;
+//        if (this.isClientDisconnected()) return;
 
-        geoDataClient.getPlaceById(placeID).setResultCallback(new ResultCallback<PlaceBuffer>() {
-            @Override
-            public void onResult(PlaceBuffer places) {
-                if (places.getStatus().isSuccess()) {
-                    if (places.getCount() == 0) {
-                        WritableMap emptyResult = Arguments.createMap();
-                        places.release();
-                        promise.resolve(emptyResult);
-                        return;
-                    }
-
-                    final Place place = places.get(0);
-
-                    WritableMap map = propertiesMapForPlace(place);
-
-                    // Release the PlaceBuffer to prevent a memory leak
-                    places.release();
-
-                    promise.resolve(map);
-
-                } else {
-                    places.release();
-                    promise.reject("E_PLACE_DETAILS_ERROR",
-                            new Error("Error making place lookup API call: " + places.getStatus().toString()));
-                    return;
-                }
-            }
-        });
+//        geoDataClient.getPlaceById(placeID).addOnCompleteListener(new OnCompleteListener<PlaceBuffer>() {
+//            @Override
+//            public void onResult(PlaceBuffer places) {
+//                if (places.getStatus().isSuccess()) {
+//                    if (places.getCount() == 0) {
+//                        WritableMap emptyResult = Arguments.createMap();
+//                        places.release();
+//                        promise.resolve(emptyResult);
+//                        return;
+//                    }
+//
+//                    final Place place = places.get(0);
+//
+//                    WritableMap map = propertiesMapForPlace(place);
+//
+//                    // Release the PlaceBuffer to prevent a memory leak
+//                    places.release();
+//
+//                    promise.resolve(map);
+//
+//                } else {
+//                    places.release();
+//                    promise.reject("E_PLACE_DETAILS_ERROR",
+//                            new Error("Error making place lookup API call: " + places.getStatus().toString()));
+//                    return;
+//                }
+//            }
+//        });
     }
 
     @ReactMethod
@@ -332,71 +334,71 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
             placeIDsStrings.add(Objects.toString(item, null));
         }
 
-        geoDataClient.getPlaceById(placeIDsStrings.toArray(new String[placeIDsStrings.size()]))
-                .setResultCallback(new ResultCallback<PlaceBuffer>() {
-                    @Override
-                    public void onResult(PlaceBuffer places) {
-                        if (places.getStatus().isSuccess()) {
-                            if (places.getCount() == 0) {
-                                WritableMap emptyResult = Arguments.createMap();
-                                places.release();
-                                promise.resolve(emptyResult);
-                                return;
-                            }
-
-                            WritableArray resultList = processLookupByIDsPlaces(places);
-
-                            // Release the PlaceBuffer to prevent a memory leak
-                            places.release();
-
-                            promise.resolve(resultList);
-                        } else {
-                            places.release();
-                            promise.reject("E_PLACE_DETAILS_ERROR",
-                                    new Error("Error making place lookup API call: " + places.getStatus().toString()));
-                            return;
-                        }
-                    }
-                });
+//        geoDataClient.getPlaceById(placeIDsStrings.toArray(new String[placeIDsStrings.size()]))
+//                .setResultCallback(new ResultCallback<PlaceBuffer>() {
+//                    @Override
+//                    public void onResult(PlaceBuffer places) {
+//                        if (places.getStatus().isSuccess()) {
+//                            if (places.getCount() == 0) {
+//                                WritableMap emptyResult = Arguments.createMap();
+//                                places.release();
+//                                promise.resolve(emptyResult);
+//                                return;
+//                            }
+//
+//                            WritableArray resultList = processLookupByIDsPlaces(places);
+//
+//                            // Release the PlaceBuffer to prevent a memory leak
+//                            places.release();
+//
+//                            promise.resolve(resultList);
+//                        } else {
+//                            places.release();
+//                            promise.reject("E_PLACE_DETAILS_ERROR",
+//                                    new Error("Error making place lookup API call: " + places.getStatus().toString()));
+//                            return;
+//                        }
+//                    }
+//                });
     }
 
     @ReactMethod
     public void getCurrentPlace(final Promise promise) {
-        placeDetectionClient.getCurrentPlace(null)
-            .setResultCallback(new ResultCallback<PlaceLikelihoodBuffer>() {
-                @Override
-                public void onResult(PlaceLikelihoodBuffer likelyPlaces) {
-                    final Status status = likelyPlaces.getStatus();
-
-                    if (status.isSuccess()) {
-                        if (likelyPlaces.getCount() == 0) {
-                            WritableArray emptyResult = Arguments.createArray();
-                            likelyPlaces.release();
-                            promise.resolve(emptyResult);
-                            return;
-                        }
-
-                        WritableArray likelyPlacesList = Arguments.createArray();
-
-                        for (PlaceLikelihood placeLikelihood : likelyPlaces) {
-                            WritableMap map = propertiesMapForPlace(placeLikelihood.getPlace());
-                            map.putDouble("likelihood", placeLikelihood.getLikelihood());
-
-                            likelyPlacesList.pushMap(map);
-                        }
-
-                        // Release the buffer now that all data has been copied.
-                        likelyPlaces.release();
-                        promise.resolve(likelyPlacesList);
-                    } else {
-                        Log.i(TAG, "Error making places detection api call: " + status.getStatusMessage());
-                        likelyPlaces.release();
-                        promise.reject("E_PLACE_DETECTION_API_ERROR",
-                                new Error("Error making places detection api call: " + status.getStatusMessage()));
-                        return;
-                    }
-                }
-            });
+//        placeDetectionClient.getCurrentPlace(null)
+//            .setResultCallback(new ResultCallback<PlaceLikelihoodBuffer>() {
+//                @Override
+//                public void onResult(PlaceLikelihoodBuffer likelyPlaces) {
+//                    final Status status = likelyPlaces.getStatus();
+//
+//                    if (status.isSuccess()) {
+//                        if (likelyPlaces.getCount() == 0) {
+//                            WritableArray emptyResult = Arguments.createArray();
+//                            likelyPlaces.release();
+//                            promise.resolve(emptyResult);
+//                            return;
+//                        }
+//
+//                        WritableArray likelyPlacesList = Arguments.createArray();
+//
+//                        for (PlaceLikelihood placeLikelihood : likelyPlaces) {
+//                            WritableMap map = propertiesMapForPlace(placeLikelihood.getPlace());
+//                            map.putDouble("likelihood", placeLikelihood.getLikelihood());
+//
+//                            likelyPlacesList.pushMap(map);
+//                        }
+//
+//                        // Release the buffer now that all data has been copied.
+//                        likelyPlaces.release();
+//                        promise.resolve(likelyPlacesList);
+//                    } else {
+//                        Log.i(TAG, "Error making places detection api call: " + status.getStatusMessage());
+//                        likelyPlaces.release();
+//                        promise.reject("E_PLACE_DETECTION_API_ERROR",
+//                                new Error("Error making places detection api call: " + status.getStatusMessage()));
+//                        return;
+//                    }
+//                }
+//            });
     }
 
     private WritableArray processLookupByIDsPlaces(final PlaceBuffer places) {
@@ -520,18 +522,18 @@ public class RNGooglePlacesModule extends ReactContextBaseJavaModule implements 
     }
 
     // check before any use of Google API Client
-    private boolean isClientDisconnected() {
-        if (!geoDataClient.isConnecting() &&
-                !geoDataClient.isConnected()) {
-            rejectPromise("E_GOOGLE_CLIENT_DISCONNECTED", new Error("GoogleApiClient is not connected. Will try connect again"));
-            // this will trigger again resolution on connection failure when
-            // autoClientResolution is true and if has resolution
-            geoDataClient.connect();
-            return true;
-        }
-
-        return false;
-    }
+//    private boolean isClientDisconnected() {
+//        if (!geoDataClient.isConnecting() &&
+//                !geoDataClient.isConnected()) {
+//            rejectPromise("E_GOOGLE_CLIENT_DISCONNECTED", new Error("GoogleApiClient is not connected. Will try connect again"));
+//            // this will trigger again resolution on connection failure when
+//            // autoClientResolution is true and if has resolution
+//            geoDataClient.connect();
+//            return true;
+//        }
+//
+//        return false;
+//    }
 
     @Override
     public void onNewIntent(Intent intent) {
